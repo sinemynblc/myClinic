@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}Manager Dashboard - myClinic{% endblock %}
+{% block content %}
+<h4 class="mb-4">Manager Dashboard 👔</h4>
+
+<div class="row g-4">
+    <!-- Analytics -->
+    <div class="col-md-12">
+        <div class="card p-4">
+            <h5>📊 Analytics</h5>
+            <form method="GET" class="row g-2 mb-3">
+                <div class="col-md-4">
+                    <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
+                </div>
+                <div class="col-md-4">
+                    <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                </div>
+            </form>
+            {% if analytics %}
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white p-3 text-center">
+                        <h6>Total Appointments</h6>
+                        <h3>{{ analytics.total_appointments }}</h3>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white p-3 text-center">
+                        <h6>Total Revenue</h6>
+                        <h3>{{ analytics.total_revenue }} TRY</h3>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white p-3 text-center">
+                        <h6>Vacancy Rate</h6>
+                        <h3>{{ analytics.vacancy_rate|floatformat:2 }}%</h3>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white p-3 text-center">
+                        <h6>Avg Satisfaction</h6>
+                        <h3>{{ analytics.avg_satisfaction_score|default:"N/A" }}</h3>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Pending Leave Requests -->
+    <div class="col-md-12">
+        <div class="card p-4">
+            <h5>🏖️ Pending Leave Requests</h5>
+            {% if leave_requests %}
+                <table class="table">
+                    <thead><tr><th>Doctor</th><th>Type</th><th>Start</th><th>End</th><th>Reason</th><th>Action</th></tr></thead>
+                    <tbody>
+                        {% for leave in leave_requests %}
+                        <tr>
+                            <td>Dr. {{ leave.doctor.full_name }}</td>
+                            <td>{{ leave.leave_type }}</td>
+                            <td>{{ leave.start_date }}</td>
+                            <td>{{ leave.end_date }}</td>
+                            <td>{{ leave.reason }}</td>
+                            <td>
+                                <form method="POST" action="/approve-leave/{{ leave.id }}/" style="display:inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="status" value="APPROVED">
+                                    <button class="btn btn-sm btn-success">Approve</button>
+                                </form>
+                                <form method="POST" action="/approve-leave/{{ leave.id }}/" style="display:inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="status" value="REJECTED">
+                                    <button class="btn btn-sm btn-danger">Reject</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted">No pending leave requests.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

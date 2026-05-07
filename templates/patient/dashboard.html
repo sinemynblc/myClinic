@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}Patient Dashboard - myClinic{% endblock %}
+{% block content %}
+<h4 class="mb-4">Welcome, {{ user.email }} 👋</h4>
+
+<div class="row g-4">
+    <!-- Book Appointment -->
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h5>📅 Book Appointment</h5>
+            <form method="POST" action="/book-appointment/">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Doctor</label>
+                    <select name="doctor_id" class="form-select" required>
+                        {% for doctor in doctors %}
+                            <option value="{{ doctor.user.id }}">Dr. {{ doctor.full_name }} - {{ doctor.specialty }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Date & Time</label>
+                    <input type="datetime-local" name="date_time" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Book</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- My Appointments -->
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h5>📋 My Appointments</h5>
+            {% if appointments %}
+                <table class="table table-sm">
+                    <thead><tr><th>Doctor</th><th>Date</th><th>Status</th><th>Fee</th></tr></thead>
+                    <tbody>
+                        {% for apt in appointments %}
+                        <tr>
+                            <td>Dr. {{ apt.doctor.full_name }}</td>
+                            <td>{{ apt.date_time|date:"d M Y H:i" }}</td>
+                            <td><span class="badge bg-primary">{{ apt.status }}</span></td>
+                            <td>{{ apt.calculated_fee }} TRY</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted">No appointments yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

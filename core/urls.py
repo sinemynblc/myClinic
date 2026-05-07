@@ -8,4 +8,5 @@ urlpatterns = [
     path('api/', include('analytics.urls')),
     path('api/medical/', include('medical.urls')),
     path('api/', include('messaging.urls')),
+    path('', include('frontend.urls')),
 ]

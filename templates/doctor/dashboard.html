@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}Doctor Dashboard - myClinic{% endblock %}
+{% block content %}
+<h4 class="mb-4">Welcome, Dr. {{ doctor.full_name }} 👨‍⚕️</h4>
+
+<div class="row g-4">
+    <!-- Today's Appointments -->
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h5>📅 Today's Appointments</h5>
+            {% if appointments %}
+                <table class="table table-sm">
+                    <thead><tr><th>Patient</th><th>Time</th><th>Status</th><th>Fee</th></tr></thead>
+                    <tbody>
+                        {% for apt in appointments %}
+                        <tr>
+                            <td>{{ apt.patient.full_name }}</td>
+                            <td>{{ apt.date_time|date:"H:i" }}</td>
+                            <td><span class="badge bg-primary">{{ apt.status }}</span></td>
+                            <td>{{ apt.calculated_fee }} TRY</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted">No appointments today.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Request Leave -->
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h5>🏖️ Request Leave</h5>
+            <form method="POST" action="/request-leave/">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Leave Type</label>
+                    <select name="leave_type" class="form-select">
+                        <option value="ANNUAL">Annual</option>
+                        <option value="SICK">Sick</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" name="start_date" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">End Date</label>
+                    <input type="date" name="end_date" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Reason</label>
+                    <textarea name="reason" class="form-control" rows="2"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Unread Messages -->
+    <div class="col-md-12">
+        <div class="card p-4">
+            <h5>💬 Unread Messages <span class="badge bg-danger">{{ unread_count }}</span></h5>
+            {% if messages_list %}
+                <table class="table table-sm">
+                    <thead><tr><th>Patient</th><th>Time</th></tr></thead>
+                    <tbody>
+                        {% for msg in messages_list %}
+                        <tr>
+                            <td>{{ msg.sender.full_name }}</td>
+                            <td>{{ msg.sent_at|date:"d M Y H:i" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted">No unread messages.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

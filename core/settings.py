@@ -53,6 +53,8 @@ INSTALLED_APPS = [
     'medical',
     'messaging',
     'analytics',
+
+    'frontend',
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -72,7 +74,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
