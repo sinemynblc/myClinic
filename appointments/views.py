@@ -85,8 +85,31 @@ class CreateAppointmentView(APIView):
                     status=status.HTTP_409_CONFLICT
                 )
 
-            # Get fee from AI (placeholder for now)
-            calculated_fee = doctor.base_consultation_fee
+            
+
+            # Get fee from AI
+            from ai_integration.services import calculate_dynamic_fee
+            from django.db.models import Avg
+
+            booked_count = Appointment.objects.filter(
+               doctor=doctor,
+               date_time__date=date_time.date(),
+               status__in=[Appointment.Status.BOOKED, Appointment.Status.PENDING]
+            ).count()
+
+            avg_rating = Appointment.objects.filter(
+                doctor=doctor,
+                status=Appointment.Status.COMPLETED,
+                patient_rating__isnull=False
+            ).aggregate(avg=Avg('patient_rating'))['avg']
+
+            calculated_fee = calculate_dynamic_fee(
+                doctor_id=str(doctor.user.id),
+                base_fee=doctor.base_consultation_fee,
+                booked_slots=booked_count,
+                total_slots=10,
+                avg_patient_rating=avg_rating
+            )
 
             appointment = Appointment.objects.create(
                 patient=patient,
