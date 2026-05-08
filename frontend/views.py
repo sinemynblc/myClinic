@@ -15,9 +15,10 @@ def login_view(request):
         password = request.POST.get('password')
         
         try:
-            user = User.objects.get(email=email)
-            if user.check_password(password):
-                login(request, user)
+                user = User.objects.get(email=email)
+                if user.check_password(password):
+                    user.backend = 'django.contrib.auth.backends.ModelBackend'
+                    login(request, user)
                 if user.role == 'PATIENT':
                     return redirect('/patient/dashboard/')
                 elif user.role == 'DOCTOR':
