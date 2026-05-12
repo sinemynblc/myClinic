@@ -9,7 +9,7 @@ class User(AbstractUser):
         MANAGER = 'MANAGER', 'Manager'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(unique=True) # GERİ ALDIK: Django'nun katı kuralı!
+    email = models.EmailField(unique=True)
     role = models.CharField(max_length=10, choices=Role.choices)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -31,17 +31,17 @@ class Patient(models.Model):
         return self.full_name or str(self.user_id)
 
     def anonymize(self):
-        # DSD Requirement C4: Right to be Forgotten
+        # DSD C4: Right to be Forgotten - wipe all PII then deactivate.
         self.full_name = None
         self.date_of_birth = None
         self.phone_number = None
         self.is_active = False
         self.save()
-        
-        # MÜHENDİSLİK DOKUNUŞU: Scrambling (Maskeleme)
-        # E-postayı bozarak asıl e-postayı boşa çıkarıyoruz
+
+        suffix = uuid.uuid4().hex[:8]
         self.user.is_active = False
-        self.user.email = f"deleted_{uuid.uuid4().hex[:8]}@myclinic.com"
+        self.user.email = f"deleted_{suffix}@myclinic.invalid"
+        self.user.username = f"deleted_{suffix}"
         self.user.save()
 
     def delete(self, using=None, keep_parents=False):
@@ -51,11 +51,9 @@ class Patient(models.Model):
         self.anonymize()
         return (0, {})
 
-# ... (Doctor, Manager ve TokenBlacklist sınıfların aynen kalabilir)
-
 
 class Doctor(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
+    user = models.OneToOneField(User, on_delete=models.PROTECT, primary_key=True)
     full_name = models.CharField(max_length=200)
     specialty = models.CharField(max_length=100)
     base_consultation_fee = models.DecimalField(max_digits=10, decimal_places=2)
@@ -63,13 +61,43 @@ class Doctor(models.Model):
     def __str__(self):
         return f"Dr. {self.full_name} ({self.specialty})"
 
+    def anonymize(self):
+        # DSD C4: Right to be Forgotten for staff accounts.
+        self.full_name = "Anonymized Doctor"
+        self.save()
+
+        suffix = uuid.uuid4().hex[:8]
+        self.user.is_active = False
+        self.user.email = f"deleted_{suffix}@myclinic.invalid"
+        self.user.username = f"deleted_{suffix}"
+        self.user.save()
+
+    def delete(self, using=None, keep_parents=False):
+        self.anonymize()
+        return (0, {})
+
 
 class Manager(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
+    user = models.OneToOneField(User, on_delete=models.PROTECT, primary_key=True)
     full_name = models.CharField(max_length=200)
 
     def __str__(self):
         return self.full_name
+
+    def anonymize(self):
+        # DSD C4: Right to be Forgotten for staff accounts.
+        self.full_name = "Anonymized Manager"
+        self.save()
+
+        suffix = uuid.uuid4().hex[:8]
+        self.user.is_active = False
+        self.user.email = f"deleted_{suffix}@myclinic.invalid"
+        self.user.username = f"deleted_{suffix}"
+        self.user.save()
+
+    def delete(self, using=None, keep_parents=False):
+        self.anonymize()
+        return (0, {})
 
 
 class TokenBlacklist(models.Model):
