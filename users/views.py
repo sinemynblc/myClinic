@@ -3,10 +3,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 from django.contrib.auth import authenticate
 from .serializers import RegisterSerializer, LoginSerializer
-from .models import User
+from .models import User, TokenBlacklist
+from django.utils import timezone
+from datetime import datetime
 
 
 class RegisterView(APIView):
@@ -57,6 +58,22 @@ class LogoutView(APIView):
         try:
             refresh_token = request.data['refresh_token']
             token = RefreshToken(refresh_token)
+            # DSD Requirement C1: blacklist token in both SimpleJWT and our explicit table.
+            jti = str(token.get('jti', ''))
+            exp = token.get('exp')
+            expires_at = None
+            if exp:
+                expires_at = datetime.fromtimestamp(int(exp), tz=timezone.utc)
+
+            if jti:
+                TokenBlacklist.objects.get_or_create(
+                    jti=jti,
+                    defaults={
+                        'user': request.user,
+                        'token_type': str(token.get('token_type', 'refresh')),
+                        'expires_at': expires_at,
+                    },
+                )
             token.blacklist()
             return Response({'message': 'Logged out successfully'})
         except Exception:

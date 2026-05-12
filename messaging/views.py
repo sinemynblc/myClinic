@@ -2,18 +2,10 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from cryptography.fernet import Fernet
-from django.conf import settings
-import base64
 from .models import Message
 from .serializers import SendMessageSerializer, MessageSerializer
 from users.models import Doctor, Patient
 from appointments.models import Appointment
-
-
-def get_cipher():
-    key = base64.urlsafe_b64encode(settings.SECRET_KEY[:32].encode().ljust(32)[:32])
-    return Fernet(key)
 
 
 class SendMessageView(APIView):
@@ -47,14 +39,10 @@ class SendMessageView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Encrypt message
-        cipher = get_cipher()
-        encrypted = cipher.encrypt(serializer.validated_data['message_text'].encode()).decode()
-
         message = Message.objects.create(
             sender=patient,
             receiver=doctor,
-            encrypted_content=encrypted,
+            encrypted_content=serializer.validated_data['message_text'],
             is_read=False
         )
 
@@ -77,16 +65,11 @@ class GetConversationView(APIView):
 
         messages = Message.objects.filter(sender=patient, receiver=doctor).order_by('sent_at')
 
-        cipher = get_cipher()
         result = []
         for msg in messages:
-            try:
-                decrypted = cipher.decrypt(msg.encrypted_content.encode()).decode()
-            except Exception:
-                decrypted = '[encrypted]'
             result.append({
                 'id': str(msg.id),
-                'text': decrypted,
+                'text': msg.encrypted_content,
                 'sent_at': msg.sent_at,
                 'is_read': msg.is_read
             })

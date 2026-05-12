@@ -6,6 +6,8 @@ from .models import MedicalRecord, Prescription
 from .serializers import CreateMedicalRecordSerializer, MedicalRecordSerializer, CreatePrescriptionSerializer, PrescriptionSerializer
 from users.models import Doctor, Patient
 from appointments.models import Appointment
+import threading
+from django.db import close_old_connections
 
 
 class CreateMedicalRecordView(APIView):
@@ -26,23 +28,41 @@ class CreateMedicalRecordView(APIView):
         except Patient.DoesNotExist:
             return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Call AI for analysis if analysis_data provided
-        ai_suggestions = None
-        if serializer.validated_data.get('analysis_data'):
-            from ai_integration.services import analyze_test_results
-            ai_suggestions = analyze_test_results(
-                test_data=serializer.validated_data['analysis_data'],
-                test_type='general'
-            )
-
         record = MedicalRecord.objects.create(
             patient=patient,
             doctor=doctor,
             analysis_data=serializer.validated_data.get('analysis_data'),
             doctor_notes=serializer.validated_data.get('doctor_notes', ''),
-            ai_suggestions=ai_suggestions,
+            ai_suggestions=None,
             doctor_approved=False
         )
+
+        analysis_data = serializer.validated_data.get('analysis_data')
+        if analysis_data:
+            # DSD Requirement C3: Async AI Analysis to meet 5-second constraint (HTTP 202 + background thread).
+            def _run_ai(record_id, test_data):
+                close_old_connections()
+                try:
+                    from ai_integration.services import analyze_test_results
+                    suggestions = analyze_test_results(test_data=test_data, test_type='general')
+                    MedicalRecord.objects.filter(id=record_id).update(ai_suggestions=suggestions)
+                finally:
+                    close_old_connections()
+
+            threading.Thread(
+                target=_run_ai,
+                args=(record.id, analysis_data),
+                daemon=True,
+            ).start()
+
+            return Response(
+                {
+                    'id': str(record.id),
+                    'status': 'ACCEPTED',
+                    'detail': 'AI analysis started in background.',
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
 
         return Response(MedicalRecordSerializer(record).data, status=status.HTTP_201_CREATED)
 

@@ -2,6 +2,7 @@ from django.db import models
 import uuid
 from users.models import Patient, Doctor
 from appointments.models import Appointment
+from django_cryptography.fields import encrypt
 
 
 class MedicalRecord(models.Model):
@@ -10,7 +11,8 @@ class MedicalRecord(models.Model):
     doctor = models.ForeignKey(Doctor, on_delete=models.PROTECT, related_name='medical_records')
     date = models.DateTimeField(auto_now_add=True)
     analysis_data = models.JSONField(null=True, blank=True)
-    doctor_notes = models.TextField(null=True, blank=True)
+    # DSD Requirement C5: encrypt doctor notes at rest.
+    doctor_notes = encrypt(models.TextField(null=True, blank=True))
     ai_suggestions = models.JSONField(null=True, blank=True)
     doctor_approved = models.BooleanField(default=False)
 

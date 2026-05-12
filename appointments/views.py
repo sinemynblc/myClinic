@@ -70,18 +70,49 @@ class CreateAppointmentView(APIView):
 
         doctor = Doctor.objects.get(user__id=serializer.validated_data['doctor_id'])
         date_time = serializer.validated_data['date_time']
+        # DSD Requirement C2: normalize into (date, slot) for DB UniqueConstraint.
+        appointment_date = date_time.date()
+        timeslot = date_time.timetz().replace(tzinfo=None)
 
         with transaction.atomic():
+            # DSD Requirement C6: leave check inside the booking transaction.
+            on_leave = LeaveRequest.objects.filter(
+                doctor=doctor,
+                status=LeaveRequest.Status.APPROVED,
+                start_date__lte=appointment_date,
+                end_date__gte=appointment_date
+            ).exists()
+            if on_leave:
+                return Response(
+                    {'error': 'Doctor is on approved leave for this date'},
+                    status=status.HTTP_409_CONFLICT
+                )
+
             # Check for double booking
+            # DSD Requirement C2: PostgreSQL row-level locking via select_for_update().
             existing = Appointment.objects.select_for_update().filter(
                 doctor=doctor,
-                date_time=date_time,
+                appointment_date=appointment_date,
+                timeslot=timeslot,
                 status__in=[Appointment.Status.BOOKED, Appointment.Status.PENDING]
             ).exists()
 
             if existing:
                 return Response(
                     {'error': 'This slot is already booked'},
+                    status=status.HTTP_409_CONFLICT
+                )
+
+            # DSD Requirement C6: final leave check right before create (defense in depth).
+            on_leave_final = LeaveRequest.objects.filter(
+                doctor=doctor,
+                status=LeaveRequest.Status.APPROVED,
+                start_date__lte=appointment_date,
+                end_date__gte=appointment_date
+            ).exists()
+            if on_leave_final:
+                return Response(
+                    {'error': 'Doctor leave was approved during booking. Please pick another slot.'},
                     status=status.HTTP_409_CONFLICT
                 )
 
@@ -115,7 +146,10 @@ class CreateAppointmentView(APIView):
                 patient=patient,
                 doctor=doctor,
                 date_time=date_time,
+                appointment_date=appointment_date,
+                timeslot=timeslot,
                 status=Appointment.Status.BOOKED,
+                payment_status=Appointment.PaymentStatus.UNPAID,
                 calculated_fee=calculated_fee
             )
 
