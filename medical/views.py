@@ -1,7 +1,9 @@
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+import threading
+from django.db import close_old_connections
+
 from .models import MedicalRecord, Prescription
 from .serializers import (
     CreateMedicalRecordSerializer,
@@ -11,21 +13,17 @@ from .serializers import (
 )
 from users.models import Doctor, Patient
 from appointments.models import Appointment
-import threading
-from django.db import close_old_connections
 
+# 🛡️ YENİ GÜVENLİK İZİNLERİMİZ
+from users.permissions import IsDoctor, IsDoctorOrPatient 
 
 class CreateMedicalRecordView(APIView):
-    permission_classes = [IsAuthenticated]
+    # Kapıda sadece doktorlar bekliyor
+    permission_classes = [IsDoctor]
 
     def post(self, request):
-        try:
-            doctor = Doctor.objects.get(user=request.user)
-        except Doctor.DoesNotExist:
-            return Response(
-                {'error': 'Only doctors can create medical records'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        # ❌ Eski try-except bloğu silindi.
+        doctor = request.user.doctor
 
         serializer = CreateMedicalRecordSerializer(data=request.data)
         if not serializer.is_valid():
@@ -49,7 +47,6 @@ class CreateMedicalRecordView(APIView):
         if analysis_data:
             test_type = serializer.validated_data.get('test_type', 'general')
 
-            # HTTP 202: AI runs in background; client polls GET /records/<id>/ for results.
             def _run_ai(record_id, test_data, t_type):
                 close_old_connections()
                 try:
@@ -80,10 +77,10 @@ class CreateMedicalRecordView(APIView):
 
 class GetMedicalRecordView(APIView):
     """
-    Polling endpoint for AI analysis results after a 202 response.
-    Accessible by the treating doctor or the patient themselves.
+    Hem doktor hem hasta görebilir. 
+    İçerideki nesne bazlı (Object-level) kontrol hala gerekli.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsDoctorOrPatient]
 
     def get(self, request, record_id):
         try:
@@ -92,6 +89,7 @@ class GetMedicalRecordView(APIView):
             return Response({'error': 'Record not found'}, status=status.HTTP_404_NOT_FOUND)
 
         user = request.user
+        # Bu kısım mecburi: Kayıt kime aitse o görebilmeli.
         is_treating_doctor = hasattr(user, 'doctor') and record.doctor.user == user
         is_own_patient = hasattr(user, 'patient') and record.patient.user == user
 
@@ -102,18 +100,14 @@ class GetMedicalRecordView(APIView):
 
 
 class ApproveMedicalRecordView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsDoctor]
 
     def patch(self, request, record_id):
-        try:
-            doctor = Doctor.objects.get(user=request.user)
-        except Doctor.DoesNotExist:
-            return Response(
-                {'error': 'Only doctors can approve records'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        # ❌ Eski kontrol silindi.
+        doctor = request.user.doctor
 
         try:
+            # Sadece tahlili yazan doktor onaylayabilir.
             record = MedicalRecord.objects.get(id=record_id, doctor=doctor)
         except MedicalRecord.DoesNotExist:
             return Response({'error': 'Record not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -125,15 +119,13 @@ class ApproveMedicalRecordView(APIView):
 
 class PatientHistoryView(APIView):
     """
-    RBAC:
-    - A doctor may view records for any patient (clinical necessity).
-    - A patient may only view their own history.
-    - Managers have no access to medical records.
+    Doktorlar herkesi, hastalar sadece kendini görebilir.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsDoctorOrPatient]
 
     def get(self, request, patient_id):
         user = request.user
+        # IsDoctorOrPatient içeri aldık ama 'hangi' hasta olduğunu hala kontrol etmeliyiz.
         is_doctor = hasattr(user, 'doctor')
         is_requesting_own_history = (
             hasattr(user, 'patient') and str(user.id) == str(patient_id)
@@ -157,16 +149,11 @@ class PatientHistoryView(APIView):
 
 
 class CreatePrescriptionView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsDoctor]
 
     def post(self, request):
-        try:
-            doctor = Doctor.objects.get(user=request.user)
-        except Doctor.DoesNotExist:
-            return Response(
-                {'error': 'Only doctors can create prescriptions'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        # ❌ Temizlendi!
+        doctor = request.user.doctor
 
         serializer = CreatePrescriptionSerializer(data=request.data)
         if not serializer.is_valid():
@@ -177,7 +164,6 @@ class CreatePrescriptionView(APIView):
         except Patient.DoesNotExist:
             return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Validate: appointment must belong to this doctor + patient and be completed.
         try:
             appointment = Appointment.objects.get(
                 id=serializer.validated_data['appointment_id'],

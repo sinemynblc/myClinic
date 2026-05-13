@@ -1,28 +1,25 @@
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from .models import Message
 from .serializers import SendMessageSerializer, MessageSerializer
 from users.models import Doctor, Patient
 from appointments.models import Appointment
 
+# 🛡️ YENİ GÜVENLİK GÖREVLİLERİMİZ
+from users.permissions import IsDoctor, IsPatient
 
 class SendMessageView(APIView):
     """
-    Patients send messages to doctors.
-    Requires a prior completed appointment to prevent unsolicited contact.
+    Hastalar doktorlara mesaj gönderir.
+    Daha önce TAMAMLANMIŞ bir randevu şartı aranır.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsPatient]
 
     def post(self, request):
-        try:
-            patient = Patient.objects.get(user=request.user)
-        except Patient.DoesNotExist:
-            return Response(
-                {'error': 'Only patients can send messages'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        # ❌ Eski try-except bloğu silindi.
+        # IsPatient sayesinde request.user.patient garantilendi.
+        patient = request.user.patient
 
         serializer = SendMessageSerializer(data=request.data)
         if not serializer.is_valid():
@@ -33,6 +30,7 @@ class SendMessageView(APIView):
         except Doctor.DoesNotExist:
             return Response({'error': 'Doctor not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        # Anti-Spam Kontrolü
         has_appointment = Appointment.objects.filter(
             patient=patient,
             doctor=doctor,
@@ -52,26 +50,18 @@ class SendMessageView(APIView):
             is_read=False,
         )
 
-        # C5: MessageSerializer returns 'content' (decrypted in memory by django_cryptography)
-        # only to the authorized sender here.
         return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
 
 
 class GetConversationView(APIView):
     """
-    Patient reads their own thread with a specific doctor.
-    Does NOT mutate is_read — that flag is set when the doctor reads their inbox.
+    Hasta, belirli bir doktorla olan yazışmalarını görür.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsPatient]
 
     def get(self, request, doctor_id):
-        try:
-            patient = Patient.objects.get(user=request.user)
-        except Patient.DoesNotExist:
-            return Response(
-                {'error': 'Only patients can access this endpoint'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        # ❌ Temizlendi!
+        patient = request.user.patient
 
         try:
             doctor = Doctor.objects.get(user__id=doctor_id)
@@ -84,20 +74,14 @@ class GetConversationView(APIView):
 
 class DoctorInboxView(APIView):
     """
-    Doctor reads all messages sent to them.
-    Marks messages as read on retrieval.
-    Optionally filtered by ?patient_id= to view a specific thread.
+    Doktor, kendisine gelen tüm mesajları listeler.
+    Okundu bilgisini (is_read) burada günceller.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsDoctor]
 
     def get(self, request):
-        try:
-            doctor = Doctor.objects.get(user=request.user)
-        except Doctor.DoesNotExist:
-            return Response(
-                {'error': 'Only doctors can access the inbox'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        # ❌ Temizlendi!
+        doctor = request.user.doctor
 
         messages = Message.objects.filter(receiver=doctor).order_by('sent_at')
 
@@ -105,7 +89,7 @@ class DoctorInboxView(APIView):
         if patient_id:
             messages = messages.filter(sender__user__id=patient_id)
 
-        # is_read marks that the doctor has seen the message.
+        # Mesajlar çekildiği an 'okundu' olarak işaretlenir.
         messages.filter(is_read=False).update(is_read=True)
 
         return Response(MessageSerializer(messages, many=True).data)

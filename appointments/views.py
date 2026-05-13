@@ -4,13 +4,18 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 from django.utils import timezone
+from django.db.models import Avg
+
 from .models import Appointment
 from .serializers import CreateAppointmentSerializer, AppointmentSerializer, RateAppointmentSerializer
 from users.models import Doctor, Patient
 from analytics.models import LeaveRequest
 
+# 1. ADIM: Yeni izin sınıfımızı çağırıyoruz
+from users.permissions import IsPatient 
 
 class AvailableSlotsView(APIView):
+    # Bu view hem doktorlar hem hastalar tarafından görüntülenebilir (Bilgi amaçlı)
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -24,11 +29,11 @@ class AvailableSlotsView(APIView):
             )
 
         try:
+            # Burada doctor_id dışarıdan geldiği için try-except kalmalı
             doctor = Doctor.objects.get(user__id=doctor_id)
         except Doctor.DoesNotExist:
             return Response({'error': 'Doctor not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check approved leaves
         from datetime import datetime
         date_obj = datetime.strptime(date, '%Y-%m-%d').date()
         on_leave = LeaveRequest.objects.filter(
@@ -41,7 +46,6 @@ class AvailableSlotsView(APIView):
         if on_leave:
             return Response({'available_slots': [], 'reason': 'Doctor is on leave'})
 
-        # Get booked slots
         booked = Appointment.objects.filter(
             doctor=doctor,
             date_time__date=date_obj,
@@ -56,40 +60,39 @@ class AvailableSlotsView(APIView):
 
 
 class CreateAppointmentView(APIView):
-    permission_classes = [IsAuthenticated]
+    # 2. ADIM: Kapıya IsPatient'ı diktik
+    permission_classes = [IsPatient]
 
     def post(self, request):
         serializer = CreateAppointmentSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            patient = Patient.objects.get(user=request.user)
-        except Patient.DoesNotExist:
-            return Response({'error': 'Only patients can book appointments'}, status=status.HTTP_403_FORBIDDEN)
+        # ❌ ESKİ TRY-EXCEPT SİLİNDİ!
+        # IsPatient sayesinde request.user.patient'ın varlığı garanti altında.
+        patient = request.user.patient
 
         doctor = Doctor.objects.get(user__id=serializer.validated_data['doctor_id'])
         date_time = serializer.validated_data['date_time']
-        # DSD Requirement C2: normalize into (date, slot) for DB UniqueConstraint.
         appointment_date = date_time.date()
         timeslot = date_time.timetz().replace(tzinfo=None)
 
         with transaction.atomic():
-            # DSD Requirement C6: leave check inside the booking transaction.
+            # DSD C6: İzin kontrolü
             on_leave = LeaveRequest.objects.filter(
                 doctor=doctor,
                 status=LeaveRequest.Status.APPROVED,
                 start_date__lte=appointment_date,
                 end_date__gte=appointment_date
             ).exists()
+            
             if on_leave:
                 return Response(
                     {'error': 'Doctor is on approved leave for this date'},
                     status=status.HTTP_409_CONFLICT
                 )
 
-            # Check for double booking
-            # DSD Requirement C2: PostgreSQL row-level locking via select_for_update().
+            # Çakışma kontrolü (C2)
             existing = Appointment.objects.select_for_update().filter(
                 doctor=doctor,
                 appointment_date=appointment_date,
@@ -98,34 +101,15 @@ class CreateAppointmentView(APIView):
             ).exists()
 
             if existing:
-                return Response(
-                    {'error': 'This slot is already booked'},
-                    status=status.HTTP_409_CONFLICT
-                )
+                return Response({'error': 'This slot is already booked'}, status=status.HTTP_409_CONFLICT)
 
-            # DSD Requirement C6: final leave check right before create (defense in depth).
-            on_leave_final = LeaveRequest.objects.filter(
-                doctor=doctor,
-                status=LeaveRequest.Status.APPROVED,
-                start_date__lte=appointment_date,
-                end_date__gte=appointment_date
-            ).exists()
-            if on_leave_final:
-                return Response(
-                    {'error': 'Doctor leave was approved during booking. Please pick another slot.'},
-                    status=status.HTTP_409_CONFLICT
-                )
-
-            
-
-            # Get fee from AI
+            # Dinamik Ücret Hesaplama (AI)
             from ai_integration.services import calculate_dynamic_fee
-            from django.db.models import Avg
-
+            
             booked_count = Appointment.objects.filter(
-               doctor=doctor,
-               date_time__date=date_time.date(),
-               status__in=[Appointment.Status.BOOKED, Appointment.Status.PENDING]
+                doctor=doctor,
+                date_time__date=appointment_date,
+                status__in=[Appointment.Status.BOOKED, Appointment.Status.PENDING]
             ).count()
 
             avg_rating = Appointment.objects.filter(
@@ -153,20 +137,20 @@ class CreateAppointmentView(APIView):
                 calculated_fee=calculated_fee
             )
 
-        return Response(
-            AppointmentSerializer(appointment).data,
-            status=status.HTTP_201_CREATED
-        )
+        return Response(AppointmentSerializer(appointment).data, status=status.HTTP_201_CREATED)
 
 
 class CancelAppointmentView(APIView):
-    permission_classes = [IsAuthenticated]
+    # 3. ADIM: Sadece hastalar kendi randevusunu iptal edebilir
+    permission_classes = [IsPatient]
 
     def delete(self, request, appointment_id):
+        # ❌ PATIENT KONTROLÜ SİLİNDİ, DOĞRUDAN KULLANIYORUZ
+        patient = request.user.patient
+        
         try:
-            patient = Patient.objects.get(user=request.user)
             appointment = Appointment.objects.get(id=appointment_id, patient=patient)
-        except (Patient.DoesNotExist, Appointment.DoesNotExist):
+        except Appointment.DoesNotExist:
             return Response({'error': 'Appointment not found'}, status=status.HTTP_404_NOT_FOUND)
 
         if appointment.status == Appointment.Status.COMPLETED:
@@ -178,17 +162,19 @@ class CancelAppointmentView(APIView):
 
 
 class RateAppointmentView(APIView):
-    permission_classes = [IsAuthenticated]
+    # 4. ADIM: Sadece hastalar puan verebilir
+    permission_classes = [IsPatient]
 
     def post(self, request, appointment_id):
+        patient = request.user.patient
+        
         try:
-            patient = Patient.objects.get(user=request.user)
             appointment = Appointment.objects.get(
                 id=appointment_id,
                 patient=patient,
                 status=Appointment.Status.COMPLETED
             )
-        except (Patient.DoesNotExist, Appointment.DoesNotExist):
+        except Appointment.DoesNotExist:
             return Response({'error': 'Appointment not found or not completed'}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = RateAppointmentSerializer(data=request.data)
