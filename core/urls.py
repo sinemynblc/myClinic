@@ -19,6 +19,9 @@ urlpatterns = [
     # Messaging — /api/messages/  /api/messages/inbox/  /api/messages/<doctor_id>/
     path('api/', include('messaging.urls')),
 
+    # AI — /api/ai/records/<id>/analyze/
+    path('api/ai/', include('ai_integration.urls')),
+
     # Frontend — must remain last; acts as catch-all for non-API routes
     path('', include('frontend.urls')),
 ]
