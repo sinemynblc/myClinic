@@ -5,40 +5,504 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}myClinic{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; }
-        .navbar { background-color: #2E75B6 !important; }
-        .navbar-brand, .nav-link { color: white !important; }
-        .card { border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .btn-primary { background-color: #2E75B6; border-color: #2E75B6; }
+        :root {
+            --primary:       #2563EB;
+            --primary-dark:  #1D4ED8;
+            --primary-light: #EFF6FF;
+            --success:       #059669;
+            --warning:       #D97706;
+            --danger:        #DC2626;
+            --info:          #0891B2;
+            --sidebar-bg:    #0F172A;
+            --sidebar-width: 240px;
+            --topbar-h:      60px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #F1F5F9;
+            color: #1E293B;
+            margin: 0;
+        }
+
+        /* ── Top bar ── */
+        .topbar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--topbar-h);
+            background: #fff;
+            border-bottom: 1px solid #E2E8F0;
+            display: flex;
+            align-items: center;
+            padding: 0 1.5rem;
+            z-index: 1000;
+            gap: 1rem;
+        }
+
+        .topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .topbar-brand .brand-icon {
+            width: 34px; height: 34px;
+            background: var(--primary);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        .topbar-spacer { flex: 1; }
+
+        .topbar-user {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .role-badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .role-patient  { background: #DCFCE7; color: #166534; }
+        .role-doctor   { background: #DBEAFE; color: #1E40AF; }
+        .role-manager  { background: #FEF3C7; color: #92400E; }
+
+        .avatar {
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .user-email {
+            font-size: 0.85rem;
+            color: #64748B;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .btn-logout {
+            font-size: 0.8rem;
+            padding: 0.35rem 0.85rem;
+            border-radius: 6px;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            position: fixed;
+            top: var(--topbar-h);
+            left: 0;
+            width: var(--sidebar-width);
+            height: calc(100vh - var(--topbar-h));
+            background: var(--sidebar-bg);
+            overflow-y: auto;
+            padding: 1.25rem 0;
+            z-index: 900;
+        }
+
+        .sidebar-section {
+            padding: 0.5rem 1rem 0.25rem;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .sidebar a {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 1.25rem;
+            color: #94A3B8;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-radius: 0;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .sidebar a:hover,
+        .sidebar a.active {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+
+        .sidebar a i {
+            font-size: 1rem;
+            width: 1.25rem;
+            text-align: center;
+        }
+
+        /* ── Main content ── */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--topbar-h);
+            padding: 2rem;
+            min-height: calc(100vh - var(--topbar-h));
+        }
+
+        /* no-sidebar variant (login/register) */
+        .main-content.no-sidebar {
+            margin-left: 0;
+        }
+
+        /* ── Page header ── */
+        .page-header {
+            margin-bottom: 1.75rem;
+        }
+
+        .page-header h2 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #0F172A;
+            margin: 0;
+        }
+
+        .page-header p {
+            color: #64748B;
+            font-size: 0.875rem;
+            margin: 0.25rem 0 0;
+        }
+
+        /* ── Stat cards ── */
+        .stat-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            border: 1px solid #E2E8F0;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .stat-icon {
+            width: 48px; height: 48px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+
+        .stat-icon.blue   { background: #EFF6FF; color: var(--primary); }
+        .stat-icon.green  { background: #ECFDF5; color: var(--success); }
+        .stat-icon.amber  { background: #FFFBEB; color: var(--warning); }
+        .stat-icon.cyan   { background: #ECFEFF; color: var(--info); }
+        .stat-icon.red    { background: #FEF2F2; color: var(--danger); }
+        .stat-icon.purple { background: #F5F3FF; color: #7C3AED; }
+
+        .stat-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #0F172A;
+            line-height: 1.2;
+        }
+
+        /* ── Content cards ── */
+        .content-card {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #E2E8F0;
+            overflow: hidden;
+        }
+
+        .content-card .card-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #F1F5F9;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .content-card .card-header h6 {
+            font-size: 0.925rem;
+            font-weight: 600;
+            color: #0F172A;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .content-card .card-body {
+            padding: 1.25rem 1.5rem;
+        }
+
+        /* ── Tables ── */
+        .clinic-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .clinic-table th {
+            background: #F8FAFC;
+            padding: 0.6rem 1rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid #E2E8F0;
+            text-align: left;
+        }
+
+        .clinic-table td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid #F1F5F9;
+            color: #374151;
+            vertical-align: middle;
+        }
+
+        .clinic-table tr:last-child td { border-bottom: none; }
+        .clinic-table tr:hover td { background: #F8FAFC; }
+
+        /* ── Status badges ── */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.2rem 0.65rem;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 600;
+        }
+
+        .status-badge::before {
+            content: '';
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .badge-booked    { background: #DBEAFE; color: #1D4ED8; }
+        .badge-pending   { background: #FEF3C7; color: #92400E; }
+        .badge-completed { background: #DCFCE7; color: #166534; }
+        .badge-cancelled { background: #FEE2E2; color: #991B1B; }
+        .badge-approved  { background: #DCFCE7; color: #166534; }
+        .badge-rejected  { background: #FEE2E2; color: #991B1B; }
+        .badge-annual    { background: #F3E8FF; color: #6B21A8; }
+        .badge-sick      { background: #FFE4E6; color: #9F1239; }
+
+        /* ── Forms ── */
+        .form-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.35rem;
+        }
+
+        .form-control, .form-select {
+            border: 1px solid #D1D5DB;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            padding: 0.5rem 0.85rem;
+            color: #1E293B;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            outline: none;
+        }
+
+        /* ── Buttons ── */
+        .btn {
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-radius: 8px;
+            padding: 0.5rem 1.1rem;
+            transition: all 0.15s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
+        }
+
+        .btn-success { background: var(--success); border-color: var(--success); }
+        .btn-danger  { background: var(--danger);  border-color: var(--danger); }
+
+        .btn-sm {
+            font-size: 0.78rem;
+            padding: 0.3rem 0.75rem;
+            border-radius: 6px;
+        }
+
+        /* ── Alerts ── */
+        .alert {
+            border-radius: 10px;
+            font-size: 0.875rem;
+            border: none;
+            padding: 0.75rem 1rem;
+        }
+
+        .alert-success { background: #ECFDF5; color: #065F46; }
+        .alert-danger  { background: #FEF2F2; color: #991B1B; }
+        .alert-warning { background: #FFFBEB; color: #92400E; }
+        .alert-info    { background: #EFF6FF; color: #1E40AF; }
+
+        /* ── Empty state ── */
+        .empty-state {
+            text-align: center;
+            padding: 2.5rem 1rem;
+            color: #94A3B8;
+        }
+
+        .empty-state i {
+            font-size: 2.5rem;
+            display: block;
+            margin-bottom: 0.75rem;
+            opacity: 0.4;
+        }
+
+        .empty-state p {
+            font-size: 0.875rem;
+            margin: 0;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; padding: 1rem; }
+            .stat-value { font-size: 1.25rem; }
+        }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="/">🏥 myClinic</a>
-            <div class="navbar-nav ms-auto">
-                {% if user.is_authenticated %}
-                    <span class="nav-link">{{ user.email }}</span>
-                    <a class="nav-link" href="/logout/">Logout</a>
-                {% else %}
-                    <a class="nav-link" href="/login/">Login</a>
-                    <a class="nav-link" href="/register/">Register</a>
-                {% endif %}
-            </div>
-        </div>
-    </nav>
-    <div class="container mt-4">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
+
+<!-- Top Bar -->
+<div class="topbar">
+    <a class="topbar-brand" href="/">
+        <div class="brand-icon"><i class="bi bi-heart-pulse-fill"></i></div>
+        myClinic
+    </a>
+    <div class="topbar-spacer"></div>
+    {% if user.is_authenticated %}
+    <div class="topbar-user">
+        {% if user.role == 'PATIENT' %}
+            <span class="role-badge role-patient">Patient</span>
+        {% elif user.role == 'DOCTOR' %}
+            <span class="role-badge role-doctor">Doctor</span>
+        {% elif user.role == 'MANAGER' %}
+            <span class="role-badge role-manager">Manager</span>
         {% endif %}
-        {% block content %}{% endblock %}
+        <div class="avatar">{{ user.email|first|upper }}</div>
+        <span class="user-email d-none d-md-block">{{ user.email }}</span>
+        <a href="/logout/" class="btn btn-sm btn-outline-secondary btn-logout">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% else %}
+    <div class="d-flex gap-2">
+        <a href="/login/"    class="btn btn-sm btn-outline-primary">Login</a>
+        <a href="/register/" class="btn btn-sm btn-primary">Register</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Sidebar (authenticated only) -->
+{% if user.is_authenticated %}
+<div class="sidebar">
+    {% if user.role == 'PATIENT' %}
+        <div class="sidebar-section">Patient</div>
+        <a href="/patient/dashboard/" class="{% if request.path == '/patient/dashboard/' %}active{% endif %}">
+            <i class="bi bi-grid-1x2"></i> Dashboard
+        </a>
+        <a href="/patient/dashboard/#book">
+            <i class="bi bi-calendar-plus"></i> Book Appointment
+        </a>
+        <a href="/patient/dashboard/#appointments">
+            <i class="bi bi-list-check"></i> My Appointments
+        </a>
+
+    {% elif user.role == 'DOCTOR' %}
+        <div class="sidebar-section">Doctor</div>
+        <a href="/doctor/dashboard/" class="{% if request.path == '/doctor/dashboard/' %}active{% endif %}">
+            <i class="bi bi-grid-1x2"></i> Dashboard
+        </a>
+        <a href="/doctor/dashboard/#appointments">
+            <i class="bi bi-calendar2-heart"></i> Today's Schedule
+        </a>
+        <a href="/doctor/dashboard/#leave">
+            <i class="bi bi-calendar-x"></i> Request Leave
+        </a>
+        <a href="/doctor/dashboard/#messages">
+            <i class="bi bi-chat-dots"></i> Messages
+        </a>
+
+    {% elif user.role == 'MANAGER' %}
+        <div class="sidebar-section">Management</div>
+        <a href="/manager/dashboard/" class="{% if request.path == '/manager/dashboard/' %}active{% endif %}">
+            <i class="bi bi-graph-up"></i> Analytics
+        </a>
+        <a href="/manager/dashboard/#leave">
+            <i class="bi bi-person-check"></i> Leave Requests
+        </a>
+    {% endif %}
+
+    <div class="sidebar-section mt-3">Account</div>
+    <a href="/logout/">
+        <i class="bi bi-box-arrow-right"></i> Logout
+    </a>
+</div>
+{% endif %}
+
+<!-- Main Content -->
+<div class="main-content {% if not user.is_authenticated %}no-sidebar{% endif %}">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-3" role="alert">
+                <i class="bi bi-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'danger' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}{% endblock %}
 </body>
 </html>

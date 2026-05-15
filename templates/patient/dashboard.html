@@ -1,54 +1,374 @@
 {% extends 'base.html' %}
-{% block title %}Patient Dashboard - myClinic{% endblock %}
+{% block title %}Patient Dashboard — myClinic{% endblock %}
+
 {% block content %}
-<h4 class="mb-4">Welcome, {{ user.email }} 👋</h4>
+<!-- Page header -->
+<div class="page-header d-flex align-items-center justify-content-between">
+    <div>
+        <h2>Good day, {{ user.email|truncatechars:24 }}</h2>
+        <p>Here's an overview of your health activity</p>
+    </div>
+    <span style="font-size:0.8rem;color:#94A3B8;">
+        <i class="bi bi-calendar3 me-1"></i>{% now "l, d F Y" %}
+    </span>
+</div>
+
+<!-- Stat row -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="bi bi-calendar-check"></i></div>
+            <div>
+                <div class="stat-label">Total</div>
+                <div class="stat-value">{{ total_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="bi bi-check2-circle"></i></div>
+            <div>
+                <div class="stat-label">Completed</div>
+                <div class="stat-value">{{ completed_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon amber"><i class="bi bi-clock"></i></div>
+            <div>
+                <div class="stat-label">Upcoming</div>
+                <div class="stat-value">{{ upcoming_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon purple"><i class="bi bi-people"></i></div>
+            <div>
+                <div class="stat-label">Doctors</div>
+                <div class="stat-value">{{ doctors|length }}</div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="row g-4">
     <!-- Book Appointment -->
-    <div class="col-md-6">
-        <div class="card p-4">
-            <h5>📅 Book Appointment</h5>
-            <form method="POST" action="/book-appointment/">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <label class="form-label">Doctor</label>
-                    <select name="doctor_id" class="form-select" required>
-                        {% for doctor in doctors %}
-                            <option value="{{ doctor.user.id }}">Dr. {{ doctor.full_name }} - {{ doctor.specialty }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Date & Time</label>
-                    <input type="datetime-local" name="date_time" class="form-control" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Book</button>
-            </form>
+    <div class="col-lg-5" id="book">
+        <div class="content-card h-100">
+            <div class="card-header">
+                <h6><i class="bi bi-calendar-plus" style="color:#2563EB;"></i> Book Appointment</h6>
+                <span style="font-size:0.72rem;color:#94A3B8;">09:00 – 16:00 · 10 min slots</span>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/patient/dashboard/" id="booking-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="book">
+                    <input type="hidden" name="date_time" id="selected-datetime">
+
+                    <div class="mb-3">
+                        <label class="form-label">Select Doctor</label>
+                        <select name="doctor_id" id="doctor-select" class="form-select" required>
+                            <option value="" disabled selected>Choose a doctor…</option>
+                            {% for doctor in doctors %}
+                                <option value="{{ doctor.user.id }}">
+                                    Dr. {{ doctor.full_name }} — {{ doctor.specialty }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Select Date</label>
+                        <input type="date" id="slot-date" class="form-control" required>
+                    </div>
+
+                    <div id="slot-section" style="display:none;">
+                        <label class="form-label">Available Slots</label>
+                        <div id="slot-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-height:220px;overflow-y:auto;padding:2px;"></div>
+                        <div id="slot-loading" style="display:none;text-align:center;padding:1rem;color:#94A3B8;font-size:0.85rem;">
+                            <i class="bi bi-arrow-repeat"></i> Loading slots…
+                        </div>
+                        <div id="slot-empty" style="display:none;text-align:center;padding:1rem;color:#94A3B8;font-size:0.85rem;">
+                            <i class="bi bi-calendar-x"></i> No slots available for this date.
+                        </div>
+                    </div>
+
+                    <div id="selected-slot-info" style="display:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;" class="mt-3 p-2">
+                        <i class="bi bi-clock-fill me-1" style="color:#2563EB;"></i>
+                        <span id="selected-slot-text" style="font-size:0.85rem;font-weight:600;color:#1D4ED8;"></span>
+                    </div>
+
+                    <button type="submit" id="book-btn" class="btn btn-primary w-100 mt-3" disabled>
+                        <i class="bi bi-calendar-check me-2"></i>Confirm Booking
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
     <!-- My Appointments -->
-    <div class="col-md-6">
-        <div class="card p-4">
-            <h5>📋 My Appointments</h5>
+    <div class="col-lg-7" id="appointments">
+        <div class="content-card">
+            <div class="card-header">
+                <h6><i class="bi bi-list-check" style="color:#059669;"></i> My Appointments</h6>
+                <span style="font-size:0.75rem;color:#94A3B8;">Last 10</span>
+            </div>
             {% if appointments %}
-                <table class="table table-sm">
-                    <thead><tr><th>Doctor</th><th>Date</th><th>Status</th><th>Fee</th></tr></thead>
+                <table class="clinic-table">
+                    <thead>
+                        <tr>
+                            <th>Doctor</th>
+                            <th>Specialty</th>
+                            <th>Date &amp; Time</th>
+                            <th>Status</th>
+                            <th>Fee</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         {% for apt in appointments %}
                         <tr>
-                            <td>Dr. {{ apt.doctor.full_name }}</td>
-                            <td>{{ apt.date_time|date:"d M Y H:i" }}</td>
-                            <td><span class="badge bg-primary">{{ apt.status }}</span></td>
-                            <td>{{ apt.calculated_fee }} TRY</td>
+                            <td style="font-weight:500;">Dr. {{ apt.doctor.full_name }}</td>
+                            <td style="color:#64748B;font-size:0.8rem;">{{ apt.doctor.specialty }}</td>
+                            <td style="font-size:0.82rem;">
+                                {{ apt.date_time|date:"d M Y" }}<br>
+                                <span style="color:#94A3B8;">{{ apt.date_time|date:"H:i" }}</span>
+                            </td>
+                            <td>
+                                <span class="status-badge badge-{% if apt.status == 'BOOKED' %}booked{% elif apt.status == 'COMPLETED' %}completed{% elif apt.status == 'CANCELLED' %}cancelled{% else %}pending{% endif %}">
+                                    {{ apt.status|capfirst }}
+                                </span>
+                            </td>
+                            <td style="font-weight:600;color:#0F172A;">
+                                {% if apt.calculated_fee %}{{ apt.calculated_fee|floatformat:0 }} ₺{% else %}—{% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             {% else %}
-                <p class="text-muted">No appointments yet.</p>
+                <div class="empty-state">
+                    <i class="bi bi-calendar-x"></i>
+                    <p>No appointments yet. Book your first one!</p>
+                </div>
             {% endif %}
         </div>
     </div>
 </div>
+
+<!-- Messaging -->
+<div class="row g-4 mt-1" id="messages">
+    <!-- Send Message -->
+    <div class="col-lg-5">
+        <div class="content-card">
+            <div class="card-header">
+                <h6><i class="bi bi-chat-dots" style="color:#0891B2;"></i> Send Message to Doctor</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/patient/dashboard/">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="message">
+                    <div class="mb-3">
+                        <label class="form-label">Doctor</label>
+                        <select name="doctor_id" class="form-select" required>
+                            <option value="" disabled selected>Choose a doctor…</option>
+                            {% for doctor in doctors %}
+                                <option value="{{ doctor.user.id }}">
+                                    Dr. {{ doctor.full_name }} — {{ doctor.specialty }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Message</label>
+                        <textarea name="content" class="form-control" rows="4"
+                                  placeholder="Write your message here…" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-send me-2"></i>Send Message
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sent Messages -->
+    <div class="col-lg-7">
+        <div class="content-card">
+            <div class="card-header">
+                <h6><i class="bi bi-envelope-check" style="color:#059669;"></i> Sent Messages</h6>
+                <span style="font-size:0.75rem;color:#94A3B8;">Last 20</span>
+            </div>
+            {% if sent_messages %}
+                <div style="display:flex;flex-direction:column;">
+                {% for msg in sent_messages %}
+                <div style="padding:1rem 1.25rem;border-bottom:1px solid #F1F5F9;">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span style="font-weight:600;font-size:0.85rem;color:#0F172A;">
+                            Dr. {{ msg.receiver.full_name }}
+                        </span>
+                        <span style="font-size:0.75rem;color:#94A3B8;">{{ msg.sent_at|date:"d M Y, H:i" }}</span>
+                    </div>
+                    <p style="font-size:0.83rem;color:#374151;margin:0 0 0.5rem;line-height:1.5;">
+                        {{ msg.encrypted_content }}
+                    </p>
+                    {% if msg.reply_content %}
+                    <div style="background:#EFF6FF;border-left:3px solid #2563EB;padding:0.6rem 0.85rem;border-radius:0 6px 6px 0;">
+                        <div style="font-size:0.7rem;color:#2563EB;font-weight:600;margin-bottom:0.25rem;">
+                            <i class="bi bi-reply-fill me-1"></i>Dr. {{ msg.receiver.full_name }} replied · {{ msg.replied_at|date:"d M, H:i" }}
+                        </div>
+                        <p style="font-size:0.83rem;color:#1E40AF;margin:0;">{{ msg.reply_content }}</p>
+                    </div>
+                    {% else %}
+                    <span style="font-size:0.75rem;color:#94A3B8;font-style:italic;">
+                        <i class="bi bi-clock me-1"></i>Awaiting reply
+                    </span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-chat-square"></i>
+                    <p>No messages sent yet.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<!-- My Health Records -->
+{% if health_records %}
+<div class="row g-4 mt-1" id="records">
+    <div class="col-12">
+        <div class="content-card">
+            <div class="card-header">
+                <h6><i class="bi bi-file-medical" style="color:#7C3AED;"></i> My Health Records</h6>
+                <span style="font-size:0.75rem;color:#94A3B8;">Doctor-approved</span>
+            </div>
+            <div style="display:flex;flex-direction:column;">
+            {% for rec in health_records %}
+            <div style="padding:1.1rem 1.5rem;border-bottom:1px solid #F1F5F9;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div>
+                        <span style="font-weight:600;font-size:0.875rem;">{{ rec.analysis_data.test_type|default:"Medical Record" }}</span>
+                        <span style="font-size:0.78rem;color:#64748B;margin-left:0.5rem;">Dr. {{ rec.doctor.full_name }}</span>
+                    </div>
+                    <span style="font-size:0.75rem;color:#94A3B8;">{{ rec.date|date:"d M Y" }}</span>
+                </div>
+
+                {% if rec.ai_suggestions %}
+                {% with s=rec.ai_suggestions %}
+                <p style="font-size:0.83rem;color:#374151;margin:0 0 0.75rem;background:#F8FAFC;padding:0.6rem 0.85rem;border-radius:8px;line-height:1.5;">
+                    {{ s.summary }}
+                </p>
+                {% if s.anomalies %}
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0.6rem;">
+                    {% for a in s.anomalies %}
+                    <span style="font-size:0.75rem;font-weight:600;padding:0.2rem 0.65rem;border-radius:20px;
+                        background:{% if a.severity == 'high' %}#FEE2E2{% elif a.severity == 'moderate' %}#FEF3C7{% else %}#DBEAFE{% endif %};
+                        color:{% if a.severity == 'high' %}#991B1B{% elif a.severity == 'moderate' %}#92400E{% else %}#1E40AF{% endif %};">
+                        {{ a.parameter }}: {{ a.value }}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <p style="font-size:0.78rem;color:#94A3B8;margin:0;font-style:italic;">
+                    <i class="bi bi-shield-check me-1"></i>{{ s.disclaimer }}
+                </p>
+                {% endwith %}
+                {% endif %}
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const doctorSelect = document.getElementById('doctor-select');
+    const dateInput    = document.getElementById('slot-date');
+    const slotSection  = document.getElementById('slot-section');
+    const slotGrid     = document.getElementById('slot-grid');
+    const slotLoading  = document.getElementById('slot-loading');
+    const slotEmpty    = document.getElementById('slot-empty');
+    const selectedDt   = document.getElementById('selected-datetime');
+    const selectedInfo = document.getElementById('selected-slot-info');
+    const selectedText = document.getElementById('selected-slot-text');
+    const bookBtn      = document.getElementById('book-btn');
+
+    dateInput.min = new Date().toISOString().split('T')[0];
+
+    let activeSlot = null;
+
+    function clearSelection() {
+        activeSlot = null;
+        selectedDt.value = '';
+        selectedInfo.style.display = 'none';
+        bookBtn.disabled = true;
+    }
+
+    function fetchSlots() {
+        const doctorId = doctorSelect.value;
+        const date     = dateInput.value;
+        if (!doctorId || !date) return;
+
+        clearSelection();
+        slotSection.style.display  = 'block';
+        slotGrid.innerHTML         = '';
+        slotEmpty.style.display    = 'none';
+        slotLoading.style.display  = 'block';
+
+        fetch(`/slots/?doctor_id=${encodeURIComponent(doctorId)}&date=${date}`)
+            .then(r => r.json())
+            .then(data => {
+                slotLoading.style.display = 'none';
+                const slots = data.slots || [];
+                if (!slots.length || !slots.some(s => s.available)) {
+                    slotEmpty.style.display = 'block';
+                    return;
+                }
+                slots.forEach(slot => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = slot.time;
+                    Object.assign(btn.style, {
+                        fontSize: '0.78rem', padding: '0.35rem 0.25rem',
+                        borderRadius: '6px', fontWeight: '500',
+                        border: '1px solid', transition: 'all .15s',
+                    });
+                    if (slot.available) {
+                        Object.assign(btn.style, {
+                            background: '#EFF6FF', color: '#2563EB',
+                            borderColor: '#BFDBFE', cursor: 'pointer',
+                        });
+                        btn.addEventListener('click', () => {
+                            if (activeSlot) Object.assign(activeSlot.style, { background: '#EFF6FF', color: '#2563EB', borderColor: '#BFDBFE' });
+                            Object.assign(btn.style, { background: '#2563EB', color: '#fff', borderColor: '#2563EB' });
+                            activeSlot = btn;
+                            selectedDt.value = `${date} ${slot.time}`;
+                            selectedText.textContent = `Selected: ${date} at ${slot.time}`;
+                            selectedInfo.style.display = 'block';
+                            bookBtn.disabled = false;
+                        });
+                    } else {
+                        Object.assign(btn.style, {
+                            background: '#F3F4F6', color: '#D1D5DB',
+                            borderColor: '#E5E7EB', cursor: 'not-allowed', textDecoration: 'line-through',
+                        });
+                    }
+                    slotGrid.appendChild(btn);
+                });
+            })
+            .catch(() => { slotLoading.style.display = 'none'; slotEmpty.style.display = 'block'; });
+    }
+
+    doctorSelect.addEventListener('change', fetchSlots);
+    dateInput.addEventListener('change', fetchSlots);
+})();
+</script>
 {% endblock %}

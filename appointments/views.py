@@ -8,6 +8,7 @@ from django.db.models import Avg
 
 from .models import Appointment
 from .serializers import CreateAppointmentSerializer, AppointmentSerializer, RateAppointmentSerializer
+from .emails import send_booking_confirmation, send_doctor_notification, send_followup_reminder
 from users.models import Doctor, Patient
 from analytics.models import LeaveRequest
 
@@ -136,6 +137,13 @@ class CreateAppointmentView(APIView):
                 payment_status=Appointment.PaymentStatus.UNPAID,
                 calculated_fee=calculated_fee
             )
+
+        try:
+            send_booking_confirmation(appointment)
+            send_doctor_notification(appointment)
+            send_followup_reminder(appointment)   # demo placeholder
+        except Exception:
+            pass  # emails are non-critical; never block the response
 
         return Response(AppointmentSerializer(appointment).data, status=status.HTTP_201_CREATED)
 

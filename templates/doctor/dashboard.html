@@ -1,83 +1,413 @@
 {% extends 'base.html' %}
-{% block title %}Doctor Dashboard - myClinic{% endblock %}
+{% block title %}Doctor Dashboard — myClinic{% endblock %}
+
 {% block content %}
-<h4 class="mb-4">Welcome, Dr. {{ doctor.full_name }} 👨‍⚕️</h4>
+<!-- Page header -->
+<div class="page-header d-flex align-items-center justify-content-between">
+    <div>
+        <h2>Dr. {{ doctor.full_name }}</h2>
+        <p>{{ doctor.specialty }} &nbsp;·&nbsp; Today's schedule and leave management</p>
+    </div>
+    <span style="font-size:0.8rem;color:#94A3B8;">
+        <i class="bi bi-calendar3 me-1"></i>{% now "l, d F Y" %}
+    </span>
+</div>
 
-<div class="row g-4">
-    <!-- Today's Appointments -->
-    <div class="col-md-6">
-        <div class="card p-4">
-            <h5>📅 Today's Appointments</h5>
-            {% if appointments %}
-                <table class="table table-sm">
-                    <thead><tr><th>Patient</th><th>Time</th><th>Status</th><th>Fee</th></tr></thead>
-                    <tbody>
-                        {% for apt in appointments %}
-                        <tr>
-                            <td>{{ apt.patient.full_name }}</td>
-                            <td>{{ apt.date_time|date:"H:i" }}</td>
-                            <td><span class="badge bg-primary">{{ apt.status }}</span></td>
-                            <td>{{ apt.calculated_fee }} TRY</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p class="text-muted">No appointments today.</p>
-            {% endif %}
+<!-- Stat row -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="bi bi-calendar2-heart"></i></div>
+            <div>
+                <div class="stat-label">Today</div>
+                <div class="stat-value">{{ appointments|length }}</div>
+            </div>
         </div>
     </div>
-
-    <!-- Request Leave -->
-    <div class="col-md-6">
-        <div class="card p-4">
-            <h5>🏖️ Request Leave</h5>
-            <form method="POST" action="/request-leave/">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <label class="form-label">Leave Type</label>
-                    <select name="leave_type" class="form-select">
-                        <option value="ANNUAL">Annual</option>
-                        <option value="SICK">Sick</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Start Date</label>
-                    <input type="date" name="start_date" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">End Date</label>
-                    <input type="date" name="end_date" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Reason</label>
-                    <textarea name="reason" class="form-control" rows="2"></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary">Submit</button>
-            </form>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon cyan"><i class="bi bi-chat-dots"></i></div>
+            <div>
+                <div class="stat-label">Unread</div>
+                <div class="stat-value">{{ unread_count }}</div>
+            </div>
         </div>
     </div>
-
-    <!-- Unread Messages -->
-    <div class="col-md-12">
-        <div class="card p-4">
-            <h5>💬 Unread Messages <span class="badge bg-danger">{{ unread_count }}</span></h5>
-            {% if messages_list %}
-                <table class="table table-sm">
-                    <thead><tr><th>Patient</th><th>Time</th></tr></thead>
-                    <tbody>
-                        {% for msg in messages_list %}
-                        <tr>
-                            <td>{{ msg.sender.full_name }}</td>
-                            <td>{{ msg.sent_at|date:"d M Y H:i" }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p class="text-muted">No unread messages.</p>
-            {% endif %}
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="bi bi-person-check"></i></div>
+            <div>
+                <div class="stat-label">Specialty</div>
+                <div class="stat-value" style="font-size:1rem;">{{ doctor.specialty|truncatechars:10 }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon amber"><i class="bi bi-currency-exchange"></i></div>
+            <div>
+                <div class="stat-label">Base Fee</div>
+                <div class="stat-value" style="font-size:1.1rem;">{{ doctor.base_consultation_fee|floatformat:0 }} ₺</div>
+            </div>
         </div>
     </div>
 </div>
+
+<div class="row g-4">
+    <!-- Today's Appointments -->
+    <div class="col-lg-7" id="appointments">
+        <div class="content-card">
+            <div class="card-header">
+                <h6><i class="bi bi-calendar2-heart" style="color:#2563EB;"></i> Today's Appointments</h6>
+                <span style="font-size:0.75rem;color:#94A3B8;">{% now "d F Y" %}</span>
+            </div>
+            {% if appointments %}
+                <table class="clinic-table">
+                    <thead>
+                        <tr>
+                            <th>Patient</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th>Fee</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for apt in appointments %}
+                        <tr>
+                            <td style="font-weight:500;">{{ apt.patient.full_name|default:apt.patient.user.email }}</td>
+                            <td>
+                                <span style="background:#EFF6FF;color:#1D4ED8;padding:0.2rem 0.6rem;border-radius:6px;font-size:0.8rem;font-weight:600;">
+                                    {{ apt.date_time|date:"H:i" }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-badge badge-{% if apt.status == 'BOOKED' %}booked{% elif apt.status == 'COMPLETED' %}completed{% elif apt.status == 'CANCELLED' %}cancelled{% else %}pending{% endif %}">
+                                    {{ apt.status|capfirst }}
+                                </span>
+                            </td>
+                            <td style="font-weight:600;">
+                                {% if apt.calculated_fee %}{{ apt.calculated_fee|floatformat:0 }} ₺{% else %}—{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-calendar-check"></i>
+                    <p>No appointments scheduled for today.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Right column -->
+    <div class="col-lg-5 d-flex flex-column gap-4">
+
+        <!-- Request Leave -->
+        <div class="content-card" id="leave">
+            <div class="card-header">
+                <h6><i class="bi bi-calendar-x" style="color:#D97706;"></i> Request Leave</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/doctor/dashboard/">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Leave Type</label>
+                        <select name="leave_type" class="form-select">
+                            <option value="ANNUAL">Annual Leave</option>
+                            <option value="SICK">Sick Leave</option>
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Start Date</label>
+                            <input type="date" name="start_date" id="start_date" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">End Date</label>
+                            <input type="date" name="end_date" id="end_date" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reason</label>
+                        <textarea name="reason" class="form-control" rows="2" placeholder="Brief description…"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-send me-2"></i>Submit Request
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Inbox -->
+        <div class="content-card" id="messages">
+            <div class="card-header">
+                <h6><i class="bi bi-chat-dots" style="color:#0891B2;"></i> Patient Messages</h6>
+                {% if unread_count %}
+                    <span class="status-badge badge-booked">{{ unread_count }} new</span>
+                {% endif %}
+            </div>
+            {% if inbox %}
+                <div style="display:flex;flex-direction:column;gap:0;">
+                {% for msg in inbox %}
+                <div style="padding:1rem 1.25rem;border-bottom:1px solid #F1F5F9;">
+                    <!-- Message header -->
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span style="font-weight:600;font-size:0.875rem;">
+                            {{ msg.sender.full_name|default:msg.sender.user.email }}
+                        </span>
+                        <span style="font-size:0.75rem;color:#94A3B8;">{{ msg.sent_at|date:"d M Y, H:i" }}</span>
+                    </div>
+                    <!-- Message content -->
+                    <p style="font-size:0.85rem;color:#374151;margin:0 0 0.75rem;line-height:1.5;">
+                        {{ msg.encrypted_content }}
+                    </p>
+                    <!-- Existing reply -->
+                    {% if msg.reply_content %}
+                    <div style="background:#F0FDF4;border-left:3px solid #059669;padding:0.6rem 0.85rem;border-radius:0 6px 6px 0;margin-bottom:0.75rem;">
+                        <div style="font-size:0.7rem;color:#059669;font-weight:600;margin-bottom:0.25rem;">
+                            <i class="bi bi-reply-fill me-1"></i>Your reply · {{ msg.replied_at|date:"d M, H:i" }}
+                        </div>
+                        <p style="font-size:0.83rem;color:#166534;margin:0;">{{ msg.reply_content }}</p>
+                    </div>
+                    {% endif %}
+                    <!-- Reply form -->
+                    {% if not msg.reply_content %}
+                    <form method="POST" action="/doctor/dashboard/" class="d-flex gap-2 align-items-end">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type"  value="reply">
+                        <input type="hidden" name="message_id" value="{{ msg.id }}">
+                        <textarea name="reply_content" class="form-control form-control-sm"
+                                  rows="2" placeholder="Write your reply…" required
+                                  style="font-size:0.82rem;resize:none;"></textarea>
+                        <button type="submit" class="btn btn-sm btn-primary" style="white-space:nowrap;">
+                            <i class="bi bi-reply"></i> Reply
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state" style="padding:1.5rem 1rem;">
+                    <i class="bi bi-chat-square-dots" style="font-size:1.75rem;"></i>
+                    <p>No messages yet.</p>
+                </div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+
+<!-- ── AI Medical Records ── -->
+<div class="row g-4 mt-1" id="records">
+
+    <!-- Create Record Form -->
+    <div class="col-lg-5">
+        <div class="content-card">
+            <div class="card-header">
+                <h6><i class="bi bi-robot" style="color:#7C3AED;"></i> AI Medical Analysis</h6>
+                <span style="font-size:0.72rem;color:#94A3B8;">Gemini powered</span>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/doctor/dashboard/" id="record-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="medical_record">
+
+                    <div class="mb-3">
+                        <label class="form-label">Patient</label>
+                        <select name="patient_id" class="form-select" required>
+                            <option value="" disabled selected>Select patient…</option>
+                            {% for p in all_patients %}
+                                <option value="{{ p.user.id }}">{{ p.full_name|default:p.user.email }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Test Type</label>
+                        <select name="test_type" id="test-type" class="form-select">
+                            <option value="Blood Test (CBC)">Blood Test (CBC)</option>
+                            <option value="Blood Chemistry">Blood Chemistry</option>
+                            <option value="Lipid Panel">Lipid Panel</option>
+                            <option value="Urinalysis">Urinalysis</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Test Parameters</label>
+                        <div id="param-rows" style="display:flex;flex-direction:column;gap:6px;">
+                            <!-- Default CBC rows -->
+                            <div class="d-flex gap-2 param-row">
+                                <input type="text"   name="param_key"   class="form-control form-control-sm" placeholder="Parameter" value="Hemoglobin">
+                                <input type="text"   name="param_value" class="form-control form-control-sm" placeholder="Value" style="max-width:120px;">
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-row" style="padding:0.25rem 0.5rem;">×</button>
+                            </div>
+                            <div class="d-flex gap-2 param-row">
+                                <input type="text" name="param_key"   class="form-control form-control-sm" placeholder="Parameter" value="WBC">
+                                <input type="text" name="param_value" class="form-control form-control-sm" placeholder="Value" style="max-width:120px;">
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-row" style="padding:0.25rem 0.5rem;">×</button>
+                            </div>
+                            <div class="d-flex gap-2 param-row">
+                                <input type="text" name="param_key"   class="form-control form-control-sm" placeholder="Parameter" value="Platelets">
+                                <input type="text" name="param_value" class="form-control form-control-sm" placeholder="Value" style="max-width:120px;">
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-row" style="padding:0.25rem 0.5rem;">×</button>
+                            </div>
+                            <div class="d-flex gap-2 param-row">
+                                <input type="text" name="param_key"   class="form-control form-control-sm" placeholder="Parameter" value="Glucose">
+                                <input type="text" name="param_value" class="form-control form-control-sm" placeholder="Value" style="max-width:120px;">
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-row" style="padding:0.25rem 0.5rem;">×</button>
+                            </div>
+                        </div>
+                        <button type="button" id="add-row" class="btn btn-sm btn-outline-secondary mt-2">
+                            <i class="bi bi-plus"></i> Add Parameter
+                        </button>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Doctor Notes <span style="color:#94A3B8;font-weight:400;">(optional)</span></label>
+                        <textarea name="doctor_notes" class="form-control form-control-sm" rows="2" placeholder="Clinical observations…"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-cpu me-2"></i>Run AI Analysis
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Records List with AI Results -->
+    <div class="col-lg-7">
+        <div class="content-card">
+            <div class="card-header">
+                <h6><i class="bi bi-file-medical" style="color:#059669;"></i> Medical Records</h6>
+                <span style="font-size:0.75rem;color:#94A3B8;">Last 15</span>
+            </div>
+
+            {% if medical_records %}
+            <div style="display:flex;flex-direction:column;">
+            {% for rec in medical_records %}
+            <div style="padding:1.1rem 1.25rem;border-bottom:1px solid #F1F5F9;" id="rec-{{ rec.id }}">
+
+                <!-- Record header -->
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div>
+                        <span style="font-weight:600;font-size:0.875rem;">{{ rec.patient.full_name|default:rec.patient.user.email }}</span>
+                        <span style="font-size:0.78rem;color:#64748B;margin-left:0.5rem;">{{ rec.analysis_data.test_type|default:"—" }}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="font-size:0.72rem;color:#94A3B8;">{{ rec.date|date:"d M Y, H:i" }}</span>
+                        {% if rec.doctor_approved %}
+                            <span class="status-badge badge-completed"><i class="bi bi-check-circle me-1"></i>Approved</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if rec.ai_suggestions %}
+                    {% with s=rec.ai_suggestions %}
+
+                    <!-- Summary -->
+                    <p style="font-size:0.83rem;color:#374151;margin:0 0 0.75rem;line-height:1.5;background:#F8FAFC;padding:0.6rem 0.85rem;border-radius:8px;">
+                        {{ s.summary }}
+                    </p>
+
+                    <!-- Anomalies -->
+                    {% if s.anomalies %}
+                    <div style="margin-bottom:0.75rem;">
+                        <div style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.4rem;">Anomalies</div>
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                        {% for a in s.anomalies %}
+                        <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;padding:0.3rem 0.6rem;border-radius:6px;
+                            background:{% if a.severity == 'high' %}#FEF2F2{% elif a.severity == 'moderate' %}#FFFBEB{% else %}#EFF6FF{% endif %};">
+                            <span style="font-weight:600;color:{% if a.severity == 'high' %}#DC2626{% elif a.severity == 'moderate' %}#D97706{% else %}#2563EB{% endif %};">
+                                {{ a.parameter }}
+                            </span>
+                            <span style="color:#64748B;">{{ a.value }}</span>
+                            <span style="color:#94A3B8;font-size:0.72rem;">ref: {{ a.reference }}</span>
+                            <span style="margin-left:auto;font-size:0.7rem;font-weight:600;text-transform:uppercase;
+                                color:{% if a.severity == 'high' %}#DC2626{% elif a.severity == 'moderate' %}#D97706{% else %}#2563EB{% endif %};">
+                                {{ a.severity }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Suggestions -->
+                    <p style="font-size:0.8rem;color:#374151;margin:0 0 0.5rem;">
+                        <i class="bi bi-lightbulb me-1" style="color:#D97706;"></i>{{ s.suggestions }}
+                    </p>
+
+                    <!-- Disclaimer -->
+                    <p style="font-size:0.72rem;color:#94A3B8;margin:0 0 0.75rem;font-style:italic;">
+                        <i class="bi bi-shield-check me-1"></i>{{ s.disclaimer }}
+                    </p>
+
+                    <!-- Approve -->
+                    {% if not rec.doctor_approved %}
+                    <form method="POST" action="/approve-record/{{ rec.id }}/">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-success">
+                            <i class="bi bi-check2-circle me-1"></i>Approve Record
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% endwith %}
+                {% else %}
+                    <!-- AI pending -->
+                    <div class="d-flex align-items-center gap-2" style="color:#94A3B8;font-size:0.83rem;" data-pending="{{ rec.id }}">
+                        <div class="spinner-border spinner-border-sm" role="status" style="width:14px;height:14px;border-width:2px;"></div>
+                        AI analysis in progress…
+                    </div>
+                {% endif %}
+
+            </div>
+            {% endfor %}
+            </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-file-earmark-medical"></i>
+                    <p>No records yet. Create one using the form.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('start_date').addEventListener('change', function () {
+        document.getElementById('end_date').min = this.value;
+    });
+
+    // Add parameter row
+    document.getElementById('add-row').addEventListener('click', function () {
+        const row = document.createElement('div');
+        row.className = 'd-flex gap-2 param-row';
+        row.innerHTML = `
+            <input type="text" name="param_key"   class="form-control form-control-sm" placeholder="Parameter">
+            <input type="text" name="param_value" class="form-control form-control-sm" placeholder="Value" style="max-width:120px;">
+            <button type="button" class="btn btn-sm btn-outline-danger remove-row" style="padding:0.25rem 0.5rem;">×</button>`;
+        document.getElementById('param-rows').appendChild(row);
+    });
+
+    document.getElementById('param-rows').addEventListener('click', function (e) {
+        if (e.target.classList.contains('remove-row')) {
+            const rows = document.querySelectorAll('.param-row');
+            if (rows.length > 1) e.target.closest('.param-row').remove();
+        }
+    });
+
+    // Auto-refresh pending records every 5 seconds
+    const pending = document.querySelectorAll('[data-pending]');
+    if (pending.length) {
+        setTimeout(() => location.reload(), 5000);
+    }
+</script>
 {% endblock %}

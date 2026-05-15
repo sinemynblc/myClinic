@@ -145,6 +145,11 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# ── Email (console backend for demo — swap for SMTP in production) ──
+EMAIL_BACKEND   = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'noreply@myclinic.com'
+CLINIC_NAME     = 'myClinic'
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         # DSD Requirement C1: JWT authentication.

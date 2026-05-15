@@ -1,31 +1,86 @@
 {% extends 'base.html' %}
-{% block title %}Register - myClinic{% endblock %}
+{% block title %}Create Account — myClinic{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-5">
-        <div class="card p-4 mt-5">
-            <h3 class="text-center mb-4" style="color:#2E75B6">🏥 Register</h3>
+<div class="d-flex align-items-center justify-content-center" style="min-height: calc(100vh - 60px); margin: -2rem;">
+    <div style="width:100%;max-width:440px;">
+        <div class="bg-white p-5" style="border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.1);">
+            <div class="text-center mb-4">
+                <div style="width:48px;height:48px;background:#EFF6FF;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                    <i class="bi bi-person-plus-fill" style="font-size:1.4rem;color:#2563EB;"></i>
+                </div>
+                <h4 class="fw-bold mb-1" style="color:#0F172A;">Create your account</h4>
+                <p style="color:#64748B;font-size:0.875rem;margin:0;">Join myClinic as a patient</p>
+            </div>
+
             {% if error %}
-                <div class="alert alert-danger">{{ error }}</div>
+                <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:0.85rem;">
+                    <i class="bi bi-exclamation-circle me-2"></i>{{ error }}
+                </div>
             {% endif %}
+
             <form method="POST">
                 {% csrf_token %}
                 <div class="mb-3">
-                    <label class="form-label">Username</label>
-                    <input type="text" name="username" class="form-control" required>
+                    <label class="form-label">Full name</label>
+                    <div class="input-group">
+                        <span class="input-group-text" style="border-color:#D1D5DB;background:#F9FAFB;">
+                            <i class="bi bi-person" style="color:#94A3B8;"></i>
+                        </span>
+                        <input type="text" name="username" class="form-control"
+                               placeholder="John Doe" required style="border-left:0;">
+                    </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control" required>
+                    <label class="form-label">Email address</label>
+                    <div class="input-group">
+                        <span class="input-group-text" style="border-color:#D1D5DB;background:#F9FAFB;">
+                            <i class="bi bi-envelope" style="color:#94A3B8;"></i>
+                        </span>
+                        <input type="email" name="email" class="form-control"
+                               placeholder="you@example.com" required style="border-left:0;">
+                    </div>
                 </div>
-                <div class="mb-3">
+                <div class="mb-4">
                     <label class="form-label">Password</label>
-                    <input type="password" name="password" class="form-control" required>
+                    <div class="input-group">
+                        <span class="input-group-text" style="border-color:#D1D5DB;background:#F9FAFB;">
+                            <i class="bi bi-lock" style="color:#94A3B8;"></i>
+                        </span>
+                        <input type="password" name="password" id="password" class="form-control"
+                               placeholder="••••••••" required style="border-left:0;border-right:0;">
+                        <button type="button" class="input-group-text" style="border-color:#D1D5DB;background:#F9FAFB;cursor:pointer;"
+                                onclick="togglePw()">
+                            <i class="bi bi-eye" id="pw-icon" style="color:#94A3B8;"></i>
+                        </button>
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-primary w-100">Register</button>
+                <button type="submit" class="btn btn-primary w-100 py-2" style="font-size:0.925rem;">
+                    <i class="bi bi-person-check me-2"></i>Create Account
+                </button>
             </form>
-            <p class="text-center mt-3">Already have an account? <a href="/login/">Login</a></p>
+
+            <p class="text-center mt-4 mb-0" style="font-size:0.85rem;color:#64748B;">
+                Already have an account?
+                <a href="/login/" style="color:#2563EB;font-weight:500;">Sign in</a>
+            </p>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePw() {
+    const pw = document.getElementById('password');
+    const ic = document.getElementById('pw-icon');
+    if (pw.type === 'password') {
+        pw.type = 'text';
+        ic.className = 'bi bi-eye-slash';
+    } else {
+        pw.type = 'password';
+        ic.className = 'bi bi-eye';
+    }
+}
+</script>
 {% endblock %}

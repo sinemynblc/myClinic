@@ -12,6 +12,8 @@ class Message(models.Model):
     encrypted_content = encrypt(models.TextField())
     sent_at = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
+    reply_content = encrypt(models.TextField(null=True, blank=True))
+    replied_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['sent_at']
