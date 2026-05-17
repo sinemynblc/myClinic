@@ -3,7 +3,8 @@
     "allow": [
       "Bash(venv\\\\Scripts\\\\python.exe *)",
       "PowerShell(venv\\\\Scripts\\\\python.exe manage.py check 2>&1)",
-      "PowerShell(venv\\\\Scripts\\\\python.exe manage.py migrate 2>&1)"
+      "PowerShell(venv\\\\Scripts\\\\python.exe manage.py migrate 2>&1)",
+      "PowerShell(cd \"C:\\\\Users\\\\Sinem\\\\myClinic\"; $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/slots/?doctor_id=test&date=2026-05-15\" -ErrorAction SilentlyContinue; $r.Content)"
     ]
   }
 }

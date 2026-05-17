@@ -20,6 +20,10 @@ def available_slots(request):
     date_str  = request.GET.get('date')
     if not doctor_id or not date_str:
         return JsonResponse({'slots': []})
+    try:
+        Doctor.objects.get(user__id=doctor_id)
+    except (Doctor.DoesNotExist, Exception):
+        return JsonResponse({'slots': []})
 
     all_slots = []
     current = datetime.strptime(f"{date_str} 09:00", "%Y-%m-%d %H:%M")
